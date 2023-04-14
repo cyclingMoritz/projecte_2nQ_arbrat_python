@@ -18,7 +18,7 @@ from qgis.PyQt import QtGui
 
 #Define default values
 
-class processes():
+class processes():  #Class that stores the processes to create the grid and count the number of points in each cell
     #Entered by the user
     layer_name = ''
     width = 0
@@ -30,32 +30,32 @@ class processes():
     qgs_layer= None
     grid = None
     count = None
-    def __init__(self,layer_name = 'Arbrat', width = 100, height = 100):
+    def __init__(self,layer_name = 'Arbrat', width = 100, height = 100):#We inicialize the class with default values
         self.layer_name=layer_name
         self.width=width
         self.height=height
-        #here we should check if the layer exists
-        self.qgs_layer=self.get_layer()
-        self.crs=self.get_crs()
-        self.coordinates=self.get_extension()
-    def get_layer(self):
+        
+        self.qgs_layer=self.get_layer() #here we get the layer to process
+        self.crs=self.get_crs() #Here we get the CRS
+        self.coordinates=self.get_extension() #Here we get the extension of the layer
+    def get_layer(self):    #This function gets the first layer that has the specified name
         return QgsProject.instance().mapLayersByName(self.layer_name)[0]
-    def get_crs(self):
-        return self.qgs_layer.crs() #We store the CRS
-    def get_extension(self):
+    def get_crs(self):  #This function gets the CRS of the specified layer
+        return self.qgs_layer.crs() 
+    def get_extension(self):    #This function gets the extension (Coordenates) of the layer
         xmin, ymin, xmax, ymax = self.qgs_layer.extent().toRectF().getCoords()#We obtain the extension of the layer 
         xmin = math.floor(xmin) #Round
         ymin = math.floor(ymin) #Round
         xmax = math.ceil(xmax) #Round
         ymax = math.ceil(ymax) #Round
-        template = "{},{},{},{}" # Creation of a template to form the coordinates
+        template = "{},{},{},{}" # Creation of a template to format the coordinates
         return template.format(xmin, xmax, ymin, ymax) #We format the coordinates
-    def calculate_cell_dimesions(self,columns,rows):
+    def calculate_cell_dimesions(self,columns,rows):    #This function calculated the cell dimensions based on the numer of columns and rows
         xmin, ymin, xmax, ymax = self.qgs_layer.extent().toRectF().getCoords()#We obtain the extension of the layer 
         self.width = (xmax-xmin)/columns #We calculate the width of the cell 
         self.heigh = (ymax-ymin)/rows #We calculate the heigh of the cell 
-    def create_grid(self):
-        params = {'TYPE':2,
+    def create_grid(self):  #This function created a a grid
+        params = {'TYPE':2, #Parameters
           'EXTENT':self.coordinates,
           'HSPACING':self.height,
           'VSPACING':self.width,
@@ -63,38 +63,37 @@ class processes():
           'VOVERLAY':0,
           'CRS':self.crs,
           'OUTPUT':'memory:grid'}
-        result=processing.run('native:creategrid', params)
-        self.grid=result['OUTPUT']
-    def count_points(self):
-        params = {
+        result=processing.run('native:creategrid', params)  #We run the process
+        self.grid=result['OUTPUT']  #We store the output
+    def count_points(self): #This function counts the number of points in each of the cells of the grid
+        params = {#Parameters
             "POLYGONS": self.grid,
             "POINTS": self.layer_name,
             "OUTPUT": "memory:heat_grid" #The text after memory is the name
         }
-        result = processing.run("native:countpointsinpolygon", params)#Run the process
-        self.count = result["OUTPUT"]
-    def add_layer(self,layer):
+        result = processing.run("native:countpointsinpolygon", params)  #We run the process
+        self.count = result["OUTPUT"]   #We store the output
+    def add_layer(self,layer):  #This function adds the layer to the map
         QgsProject().instance().addMapLayer(layer)
         
-class color():
-    #Set 1
+class color():  #Class that colors the grid based on the number of points
+    #Input variables
     layer_name=''
     targetField = ''
-    
     opacity = 0
-    #Set 2
+    intervals = 0
+    #Calculated variables
     idx = None
     min_value = 0
     max_value = 0
-    #set 3
-    intervals = 0
+    #Lists
     intervalsList = []
     rangeList = []
     list_colors = []
-    #qgis
+    #qgis variables
     qgs_layer= None
     
-    def __init__(self,layer_name = 'heat_grid',targetField = 'NUMPOINTS',  opacity = 1, intervals=5):
+    def __init__(self,layer_name = 'heat_grid',targetField = 'NUMPOINTS',  opacity = 1, intervals=5):#We inicialize the class with default values
         self.layer_name=layer_name
         self.targetField=targetField
         self.opacity=opacity
@@ -103,20 +102,20 @@ class color():
         self.qgs_layer=self.get_layer()
         self.idx=self.get_idx()
         self.min_value,self.max_value=self.get_max_min()
-    def get_layer(self):
+    def get_layer(self):    #This function gets the first layer that has the specified name
         return QgsProject.instance().mapLayersByName(self.layer_name)[0]
-    def get_idx(self):
+    def get_idx(self):  #We get the IDX of the target field
         return self.qgs_layer.fields().indexFromName(self.targetField)#Get IDX
-    def get_max_min(self):
+    def get_max_min(self):  #We the the maximim and minimum values
         return self.qgs_layer.minimumValue(self.idx), self.qgs_layer.maximumValue(self.idx)
-    def calculate_intervals(self):
+    def calculate_intervals(self):  #We calculate the intervals based on the amplitude and the number of intervals 
         amplitude=(self.max_value-self.min_value)/self.intervals
         bottom=self.min_value
-        for i in range(self.intervals):
+        for i in range(self.intervals): #We store the intervals
             value= (bottom,bottom+amplitude)
             self.intervalsList.append(value)
             bottom += amplitude
-    def generate_color_gradient(self,color1, color2):
+    def generate_color_gradient(self,color1, color2):   #Function that generates the color gradient
         """
         Generates a list of x Hex color codes between color1 and color2
         Made using chat GDP
@@ -152,7 +151,7 @@ class color():
     
             self.list_colors=colors
 
-    def layer_style(self):
+    def layer_style(self):  #Function that creates the style of the layer
         amplitude=((self.max_value-self.min_value)/self.intervals)
         bottom=self.min_value
         
@@ -174,7 +173,7 @@ class color():
             range_ = QgsRendererRange(minVal, maxVal, symbol, lab)
             self.rangeList.append(range_)
 
-    def render_colors(self):
+    def render_colors(self):    #Function that renders the colors 
         groupRenderer = QgsGraduatedSymbolRenderer('', self.rangeList)
         groupRenderer.setMode(QgsGraduatedSymbolRenderer.EqualInterval)
         groupRenderer.setClassAttribute(self.targetField)
@@ -186,9 +185,9 @@ class color():
         QgsProject.instance().addMapLayer(self.qgs_layer)
 
 
-class App(QWidget):
+class App(QWidget): #Class that contains the input dialogs
 
-    def __init__(self):
+    def __init__(self): #Values of the dialog screen
         super().__init__()
         self.title = 'PyQt5 input dialogs - pythonspot.com'
         self.left = 10
@@ -197,41 +196,42 @@ class App(QWidget):
         self.height = 4000
         self.initUI()
     
-    def initUI(self):
+    def initUI(self):   
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         
-    def select_mode(self):
+    def select_mode(self):  #Input dialog to select the mode of operation
         items = ("Automatic","Manual")
         item, okPressed = QInputDialog.getItem(self, "Select option","Mode:", items, 0, False)
         if okPressed and item:
             return(item)
 
-    def grid_mode(self):
+    def grid_mode(self):    #Input dialog to select how the grid will be made
         items = ("Set rows and columns","Set width and height")
         item, okPressed = QInputDialog.getItem(self, "Select the way the grid will be made","Options:", items, 0, False)
         if okPressed and item:
             return(item)
-    def input_int(self, text, category,default):
+        
+    def input_int(self, text, category,default):    #Input dialog to add an integrers
         i, okPressed = QInputDialog.getInt(self, text,str(category)+":", default, 1, 300, 1)
         if okPressed:
             return i
-    def input_str(self, text,category,default):
+    def input_str(self, text,category,default): #Input dialog to add strings
         text, okPressed = QInputDialog.getText(self, text ,category , QLineEdit.Normal, default)
         if okPressed and text != '':
             return text
-    def getDouble (self,text,category,default):
+    def getDouble (self,text,category,default): #Input dialog to get doubles
         d, okPressed = QInputDialog . getDouble (self , text,str(category)+":",  0.5, 0, 1, 3)
         if okPressed :
             return d
 
 
-class main():
-    QgsProject.instance().removeMapLayer("heat_grid") #We remove the grid
-    dialog= App()
-    select_mode=dialog.select_mode()
-    if(select_mode=="Automatic"):
+class main():   #Main class that clalls the other classes (It could also be a function)
+    QgsProject.instance().removeMapLayer("heat_grid") #We remove the grid in case it already existed
+    dialog= App()   #We define the app class that allows the use of dialogs
+    select_mode=dialog.select_mode()    #We ask the user to select the mode of operation
+    if(select_mode=="Automatic"):   #The automatic mode runs everything using default values
         part_one = processes()
         part_one.create_grid()
         part_one.count_points()
@@ -244,22 +244,22 @@ class main():
         part_two.generate_color_gradient(color1,color2)
         part_two.layer_style()
         part_two.render_colors()
-    elif(select_mode=="Manual"):
+    elif(select_mode=="Manual"):    #The manual mode asks the user to define all the values
         #print("Unfortunately, this has not been developed yet")
-        layer=dialog.input_str("Type the name of the layer","Layer","Arbrat")
+        layer=dialog.input_str("Type the name of the layer","Layer","Arbrat")   #We ask the name of the layer
         
-        grid_mode=dialog.grid_mode()
+        grid_mode=dialog.grid_mode()    #We ask how to create the grid
         
-        if(grid_mode=="Set width and height"):
+        if(grid_mode=="Set width and height"):  #We create the grid with the width and height
             width=dialog.input_int("Type the width","Width",50)
             height=dialog.input_int("Type the height","Height",50)
             part_one = processes(layer,width,height)  
-        elif(grid_mode=="Set rows and columns"):
+        elif(grid_mode=="Set rows and columns"):    #We create the grid with the rows and columns
             columns=dialog.input_int("Type the numer of columns","Column",50)
             rows=dialog.input_int("Type the number of rows","Row",100)
             part_one = processes(layer) 
             part_one.calculate_cell_dimesions(columns,rows)
-        part_one.create_grid()
+        part_one.create_grid()  
         part_one.count_points()
         part_one.add_layer(part_one.count)
           
